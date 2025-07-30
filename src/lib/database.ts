@@ -128,15 +128,26 @@ class Database {
   // 音频记录相关操作
   async createAudioRecord(record: Omit<AudioRecord, 'id' | 'created_at'>): Promise<AudioRecord> {
     await this.waitForReady();
-    const run = promisify(this.db.run.bind(this.db));
     const get = promisify(this.db.get.bind(this.db));
 
     try {
-      const result = await run(
-        'INSERT INTO audio_records (user_id, filename, text_content, type) VALUES (?, ?, ?, ?)',
-        [record.user_id, record.filename, record.text_content, record.type]
-      );
-      const audioRecord = await get('SELECT * FROM audio_records WHERE id = ?', [result.lastID]) as AudioRecord;
+      const result = await new Promise<sqlite3.RunResult>((resolve, reject) => {
+        this.db.run(
+          'INSERT INTO audio_records (user_id, filename, text_content, type) VALUES (?, ?, ?, ?)',
+          [record.user_id, record.filename, record.text_content, record.type],
+          function(err) {
+            if (err) reject(err);
+            else resolve(this);
+          }
+        );
+      });
+      
+      const audioRecord = await new Promise<AudioRecord>((resolve, reject) => {
+        this.db.get('SELECT * FROM audio_records WHERE id = ?', [result.lastID], (err, row) => {
+          if (err) reject(err);
+          else resolve(row as AudioRecord);
+        });
+      });
       return audioRecord;
     } catch (error) {
       throw new Error(`Failed to create audio record: ${error}`);
@@ -145,7 +156,6 @@ class Database {
 
   async getAudioRecords(userId: number, type?: string): Promise<AudioRecord[]> {
     await this.waitForReady();
-    const all = promisify(this.db.all.bind(this.db));
     
     try {
       let query = 'SELECT * FROM audio_records WHERE user_id = ?';
@@ -158,7 +168,12 @@ class Database {
       
       query += ' ORDER BY created_at DESC';
       
-      const records = await all(query, params) as AudioRecord[];
+      const records = await new Promise<AudioRecord[]>((resolve, reject) => {
+        this.db.all(query, params, (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows as AudioRecord[]);
+        });
+      });
       return records;
     } catch (error) {
       throw new Error(`Failed to get audio records: ${error}`);
@@ -168,15 +183,25 @@ class Database {
   // 声音模型相关操作
   async createVoiceModel(model: Omit<VoiceModel, 'id' | 'created_at'>): Promise<VoiceModel> {
     await this.waitForReady();
-    const run = promisify(this.db.run.bind(this.db));
-    const get = promisify(this.db.get.bind(this.db));
 
     try {
-      const result = await run(
-        'INSERT INTO voice_models (user_id, model_id, model_name, status) VALUES (?, ?, ?, ?)',
-        [model.user_id, model.model_id, model.model_name, model.status]
-      );
-      const voiceModel = await get('SELECT * FROM voice_models WHERE id = ?', [result.lastID]) as VoiceModel;
+      const result = await new Promise<sqlite3.RunResult>((resolve, reject) => {
+        this.db.run(
+          'INSERT INTO voice_models (user_id, model_id, model_name, status) VALUES (?, ?, ?, ?)',
+          [model.user_id, model.model_id, model.model_name, model.status],
+          function(err) {
+            if (err) reject(err);
+            else resolve(this);
+          }
+        );
+      });
+      
+      const voiceModel = await new Promise<VoiceModel>((resolve, reject) => {
+        this.db.get('SELECT * FROM voice_models WHERE id = ?', [result.lastID], (err, row) => {
+          if (err) reject(err);
+          else resolve(row as VoiceModel);
+        });
+      });
       return voiceModel;
     } catch (error) {
       throw new Error(`Failed to create voice model: ${error}`);
@@ -185,13 +210,18 @@ class Database {
 
   async getVoiceModels(userId: number): Promise<VoiceModel[]> {
     await this.waitForReady();
-    const all = promisify(this.db.all.bind(this.db));
     
     try {
-      const models = await all(
-        'SELECT * FROM voice_models WHERE user_id = ? ORDER BY created_at DESC',
-        [userId]
-      ) as VoiceModel[];
+      const models = await new Promise<VoiceModel[]>((resolve, reject) => {
+        this.db.all(
+          'SELECT * FROM voice_models WHERE user_id = ? ORDER BY created_at DESC',
+          [userId],
+          (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows as VoiceModel[]);
+          }
+        );
+      });
       return models;
     } catch (error) {
       throw new Error(`Failed to get voice models: ${error}`);
@@ -200,10 +230,14 @@ class Database {
 
   async updateVoiceModelStatus(id: number, status: VoiceModel['status']): Promise<void> {
     await this.waitForReady();
-    const run = promisify(this.db.run.bind(this.db));
     
     try {
-      await run('UPDATE voice_models SET status = ? WHERE id = ?', [status, id]);
+      await new Promise<void>((resolve, reject) => {
+        this.db.run('UPDATE voice_models SET status = ? WHERE id = ?', [status, id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     } catch (error) {
       throw new Error(`Failed to update voice model status: ${error}`);
     }
@@ -211,10 +245,14 @@ class Database {
 
   async deleteVoiceModel(id: number): Promise<void> {
     await this.waitForReady();
-    const run = promisify(this.db.run.bind(this.db));
     
     try {
-      await run('DELETE FROM voice_models WHERE id = ?', [id]);
+      await new Promise<void>((resolve, reject) => {
+        this.db.run('DELETE FROM voice_models WHERE id = ?', [id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     } catch (error) {
       throw new Error(`Failed to delete voice model: ${error}`);
     }
